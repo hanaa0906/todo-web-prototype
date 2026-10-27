@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Kanban TODO Board</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js" integrity="sha512-9nX+UeXcGmFzWkR0sGZfKcXgK0R+H6Uj8kVh9Gz9UuNR1y0XlV5H7Kp9L+0wB/4gCjzKx7pXqB5H8KcM9Vf5g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <style>
+    body {font-family: Arial, Helvetica, sans-serif; margin:0; padding:0; background:#f5f5f5;}
+    h1 {text-align:center; padding:1rem; background:#2c3e50; color:#ecf0f1; margin:0;}
+    .board {display:flex; justify-content:space-around; padding:1rem;}
+    .column {background:#ecf0f1; border-radius:8px; width:30%; min-height:400px; padding:0.5rem; box-shadow:0 2px 4px rgba(0,0,0,0.1);}
+    .column h2 {text-align:center; font-size:1.2rem; margin:0.5rem 0;}
+    .task {background:#fff; margin:0.5rem; padding:0.5rem; border-radius:4px; cursor:grab; box-shadow:0 1px 2px rgba(0,0,0,0.1);}
+    .task.done {text-decoration:line-through; opacity:0.6;}
+    .add-form {display:flex; margin:0.5rem;}
+    .add-form input {flex:1; padding:0.3rem;}
+    .add-form button {padding:0.3rem 0.6rem;}
+  </style>
+</head>
+<body>
+  <h1>Kanban TODO Board</h1>
+  <div class="board" id="board">
+    {% for col, tasks in columns.items() %}
+    <div class="column" data-status="{{ col }}">
+      <h2>{{ col.replace('_', ' ')|title }}</h2>
+      <form class="add-form" onsubmit="addTask(event, '{{ col }}')">
+        <input name="description" placeholder="Add {{ col }} task" required />
+        <button type="submit">+</button>
+      </form>
+      <div class="tasks" id="{{ col }}-tasks">
+        {% for task in tasks %}
+        <div class="task" draggable="true" data-id="{{ task.id }}" data-status="{{ col }}">
+          {{ task.description }}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <script>
+    const socket = io();
+
+    // Listen for realtime updates
+    socket.on('task_added', task => {
+      const container = document.getElementById(task.status + '-tasks');
+      const el = document.createElement('div');
+      el.className = 'task';
+      el.draggable = true;
+      el.dataset.id = task.id;
+      el.dataset.status = task.status;
+      el.textContent = task.description;
+      container.appendChild(el);
+    });
+
+    socket.on('task_moved', data => {
+      const taskEl = document.querySelector(`.task[data-id='${data.id}']`);
+      if (taskEl) {
+        taskEl.dataset.status = data.status;
+        document.getElementById(data.status + '-tasks').appendChild(taskEl);
+      }
+    });
+
+    // Drag‑and‑drop handling
+    document.addEventListener('dragstart', e => {
+      if (!e.target.classList.contains('task')) return;
+      e.dataTransfer.setData('text/plain', e.target.dataset.id);
+    });
+
+    document.addEventListener('dragover', e => {
+      if (e.target.classList.contains('tasks')) {
+        e.preventDefault();
+      }
+    });
+
+    document.addEventListener('drop', e => {
+      if (!e.target.classList.contains('tasks')) return;
+      e.preventDefault();
+      const id = e.dataTransfer.getData('text/plain');
+      const newStatus = e.target.parentElement.dataset.status;
+      fetch('/move', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: parseInt(id), status: newStatus})
+      });
+    });
+
+    function addTask(event, status) {
+      event.preventDefault();
+      const form = event.target;
+      const description = form.description.value.trim();
+      if (!description) return;
+      const formData = new FormData();
+      formData.append('description', description);
+      fetch('/add', {method: 'POST', body: formData})
+        .then(r => r.json())
+        .then(task => {
+          // server will broadcast via socket.io, no need to manually append
+          form.reset();
+        });
+    }
+  </script>
+</body>
+</html>
