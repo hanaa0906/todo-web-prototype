@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TODO‑CLI – Web Demo</title>
+  <style>
+    body {font-family: Arial, Helvetica, sans-serif; max-width: 600px; margin: 2rem auto;}
+    h1 {text-align: center;}
+    ul {list-style: none; padding: 0;}
+    li {margin: .5rem 0; display: flex; align-items: center; justify-content: space-between;}
+    .done {text-decoration: line-through; color: #777;}
+    button {margin-left: .5rem;}
+  </style>
+</head>
+<body>
+  <h1>🗒️ TODO List</h1>
+
+  <form method="post" action="{{ url_for('index') }}">
+    <input name="description" placeholder="New task…" required size="30">
+    <button type="submit">Add</button>
+  </form>
+
+  <ul>
+    {% for id, desc, completed in tasks %}
+      <li>
+        <span class="{{ 'done' if completed else '' }}">{{ desc }}</span>
+        {% if not completed %}
+          <a href="{{ url_for('mark_done', task_id=id) }}"><button>✓ Done</button></a>
+        {% endif %}
+        <a href="{{ url_for('delete', task_id=id) }}"><button>✖ Delete</button></a>
+      </li>
+    {% else %}
+      <li>No tasks yet.</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
